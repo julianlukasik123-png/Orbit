@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Orbit brand CSS variables — overridden per-tenant by TenantThemeProvider */
+  --brand-primary: #4f46e5;
+  --brand-secondary: #7c3aed;
+  --brand-accent: #06b6d4;
+  --brand-bg: #ffffff;
+  --brand-text: #111827;
+  --brand-font: "Inter", sans-serif;
+
+  /* Sidebar */
+  --sidebar-width: 240px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+/* Utility classes for brand theming */
+.text-brand-primary { color: var(--brand-primary); }
+.bg-brand-primary { background-color: var(--brand-primary); }
+.border-brand-primary { border-color: var(--brand-primary); }
+.text-brand-secondary { color: var(--brand-secondary); }
+.bg-brand-secondary { background-color: var(--brand-secondary); }

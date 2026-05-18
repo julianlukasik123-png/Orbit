@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum TenantPlan {
+  free
+  starter
+  pro
+  enterprise
+}
+
+enum TenantStatus {
+  active
+  suspended
+  cancelled
+}
+
+enum MemberRole {
+  owner
+  admin
+  member
+  viewer
+}
+
+enum LeadSource {
+  typeform
+  sms
+  call
+  csv
+  manual
+}
+
+enum LeadClassification {
+  pending
+  high_value
+  low_value
+  invalid
+  unqualified
+}
+
+// ============================================================
+// TENANT / MULTI-TENANCY
+// ============================================================
+
+model Tenant {
+  id                   String       @id @default(cuid())
+  name                 String
+  slug                 String       @unique
+  domain               String?      @unique
+  websiteUrl           String?
+  industry             String?
+  plan                 TenantPlan   @default(free)
+  stripeCustomerId     String?      @unique
+  stripeSubscriptionId String?
+  status               TenantStatus @default(active)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  brandConfig  TenantBrandConfig?
+  members      TenantMember[]
+  leads        Lead[]
+  smsThreads   SmsThread[]
+  enrollments  SequenceEnrollment[]
+  invitations  TenantInvitation[]
+
+  @@map("tenants")
+}
+
+model TenantBrandConfig {
+  id                String   @id @default(cuid())
+  tenantId          String   @unique
+  primaryColor      String   @default("#4F46E5")
+  secondaryColor    String   @default("#7C3AED")
+  accentColor       String?
+  backgroundColor   String   @default("#FFFFFF")
+  textColor         String   @default("#111827")
+  fontFamily        String   @default("Inter")
+  fontUrl           String?
+  logoUrl           String?
+  faviconUrl        String?
+  emailHeaderColor  String?
+  emailFooterText   String?
+  autoDiscovered    Boolean  @default(false)
+  discoveryMetadata Json?
+  lastUpdatedAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_brand_configs")
+}
+
+// ============================================================
+// LEADS
+// ============================================================
+
+model Lead {
+  id             String             @id @default(cuid())
+  tenantId       String
+  name           String?
+  email          String?
+  phone          String?
+  message        String?            @db.Text
+  source         LeadSource         @default(manual)
+  classification LeadClassification @default(pending)
+  classifyReason String?            @db.Text
+  score          Int?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  smsThread  SmsThread?
+  enrollment SequenceEnrollment?
+
+  @@index([tenantId])
+  @@index([tenantId, classification])
+  @@map("leads")
+}
+
+// ============================================================
+// SMS THREADS
+// ============================================================
+
+model SmsThread {
+  id        String       @id @default(cuid())
+  tenantId  String
+  leadId    String?      @unique
+  fromPhone String
+  toPhone   String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead     Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  messages SmsMessage[]
+
+  @@index([tenantId])
+  @@index([tenantId, fromPhone])
+  @@map("sms_threads")
+}
+
+model SmsMessage {
+  id        String    @id @default(cuid())
+  threadId  String
+  body      String    @db.Text
+  direction String
+  sid       String?
+  createdAt DateTime  @default(now())
+
+  thread SmsThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+  @@map("sms_messages")
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  lastLoginAt   DateTime?
+
+  accounts Account[]
+  sessions Session[]
+  tenants  TenantMember[]
+
+  @@map("users")
+}
+
+model TenantMember {
+  id         String     @id @default(cuid())
+  tenantId   String
+  userId     String
+  role       MemberRole @default(member)
+  invitedBy  String?
+  invitedAt  DateTime   @default(now())
+  acceptedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@map("tenant_members")
+}
+
+// ============================================================
+// NEXTAUTH ADAPTER TABLES
+// ============================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================================
+// EMAIL SEQUENCES
+// ============================================================
+
+model SequenceEnrollment {
+  id        String   @id @default(cuid())
+  tenantId  String
+  leadId    String   @unique
+  status    String   @default("active")
+  startedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead   Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  emails SequenceEmail[]
+
+  @@index([tenantId])
+  @@map("sequence_enrollments")
+}
+
+model SequenceEmail {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  tenantId     String
+  stepNumber   Int
+  subject      String
+  body         String    @db.Text
+  sendAt       DateTime
+  sentAt       DateTime?
+  openedAt     DateTime?
+  resendId     String?
+
+  enrollment SequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sendAt, sentAt])
+  @@map("sequence_emails")
+}
+
+// ============================================================
+// TEAM INVITATIONS
+// ============================================================
+
+model TenantInvitation {
+  id         String    @id @default(cuid())
+  tenantId   String
+  email      String
+  role       MemberRole @default(member)
+  token      String    @unique @default(cuid())
+  invitedBy  String
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([token])
+  @@map("tenant_invitations")
+}
