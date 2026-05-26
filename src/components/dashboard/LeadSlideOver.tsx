@@ -55,7 +55,8 @@ export function LeadSlideOver({ leadId, onClose }: Props) {
 
   if (!leadId) return null
 
-  const meta = (lead?.metadata ?? {}) as Record<string, unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meta = (lead?.metadata ?? {}) as any as Record<string, unknown>
   const hasJobDetails = meta.jobType || meta.location || meta.budget || meta.timeline
 
   return (
