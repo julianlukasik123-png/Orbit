@@ -68,7 +68,7 @@ export function ClassificationDonut({ data }: Props) {
         </Pie>
         <Tooltip
           contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
-          formatter={(value: number, name: string) => [value, name]}
+          formatter={(value, name) => [value, name]}
         />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
       </PieChart>
