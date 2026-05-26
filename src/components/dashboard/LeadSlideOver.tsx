@@ -55,8 +55,10 @@ export function LeadSlideOver({ leadId, onClose }: Props) {
 
   if (!leadId) return null
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const meta = (lead?.metadata ?? {}) as any as Record<string, unknown>
+  const meta: Record<string, unknown> = {}
+  if (lead?.metadata && typeof lead.metadata === 'object' && !Array.isArray(lead.metadata)) {
+    Object.assign(meta, lead.metadata)
+  }
   const hasJobDetails = meta.jobType || meta.location || meta.budget || meta.timeline
 
   return (
